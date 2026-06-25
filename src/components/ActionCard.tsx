@@ -97,11 +97,11 @@ export function ActionCard({ acao, blocos, variaveis, onEdit, onDelete, onDuplic
         className="p-4 bg-panel border-border border-l-[3px] transition-all"
         style={{ backgroundColor: "rgba(56,189,248,0.07)", borderLeftColor: "hsl(var(--info))" }}
       >
-        <div className="flex flex-wrap items-center gap-2 justify-between">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="font-mono text-base font-semibold tabular-nums">{horario}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:flex-1">
+            <span className="font-mono text-base font-semibold tabular-nums shrink-0">{horario}</span>
             <Tag className="w-4 h-4 text-info shrink-0" />
-            <span className="text-xs sm:text-sm text-muted-foreground truncate">{title}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground truncate flex-1 min-w-0">{title}</span>
             <StatusChip acao={acao} />
           </div>
           <CardActions onCopy={copy} onEdit={onEdit} onDelete={onDelete} onDuplicate={onDuplicate} onToggle={toggleCollapsed} ChevronIcon={ChevronIcon} />
@@ -119,9 +119,9 @@ export function ActionCard({ acao, blocos, variaveis, onEdit, onDelete, onDuplic
 
   return (
     <Card id={`acao-${acao.id}`} className="p-4 bg-panel border-border hover:border-border/80 transition-all">
-      <div className="flex flex-wrap items-start gap-2 justify-between">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <span className="font-mono text-xl sm:text-2xl font-semibold tabular-nums text-foreground">
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto sm:flex-1">
+          <span className="font-mono text-xl sm:text-2xl font-semibold tabular-nums text-foreground shrink-0">
             {horario}
           </span>
           <Icon className="w-5 h-5 text-accent shrink-0" />
@@ -182,7 +182,7 @@ function CardActions({ onCopy, onEdit, onDelete, onDuplicate, onToggle, ChevronI
   onToggle: () => void; ChevronIcon: typeof ChevronDown;
 }) {
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    <div className="flex items-center gap-1 shrink-0 ml-auto">
       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onCopy} title="Copiar">
         <Copy className="w-4 h-4" />
       </Button>
