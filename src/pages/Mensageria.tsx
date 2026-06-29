@@ -66,7 +66,6 @@ export default function Mensageria() {
   const [collapseTick, setCollapseTick] = useState(0);
   const [docLoading, setDocLoading] = useState(false);
   const [duplicateTo, setDuplicateTo] = useState<{ acao: Acao; blocos: Bloco[] } | null>(null);
-  const [duplicateDiaId, setDuplicateDiaId] = useState<string>("");
   const scrollToAcaoIdRef = useRef<string | null>(null);
 
   // Projeto pelo slug
@@ -277,13 +276,8 @@ export default function Mensageria() {
     }
   }
 
-  function handleDuplicate(acao: Acao, blocos: Bloco[], opts: { otherDay?: boolean }) {
-    if (opts.otherDay) {
-      setDuplicateTo({ acao, blocos });
-      setDuplicateDiaId(diaId);
-    } else {
-      doDuplicate(acao, blocos, diaId);
-    }
+  function handleDuplicate(acao: Acao, blocos: Bloco[]) {
+    setDuplicateTo({ acao, blocos });
   }
 
   // ========== Render guards ==========
@@ -576,8 +570,8 @@ export default function Mensageria() {
                 collapseTick={collapseTick}
                 onEdit={() => setActionModal({ open: true, editing: { acao, blocos: blocosByAcao[acao.id] ?? [] } })}
                 onDelete={() => deleteAcao(acao)}
-                onDuplicate={(opts) =>
-                  handleDuplicate(acao, blocosByAcao[acao.id] ?? [], opts)
+                onDuplicate={() =>
+                  handleDuplicate(acao, blocosByAcao[acao.id] ?? [])
                 }
               />
             ))}
@@ -634,16 +628,15 @@ export default function Mensageria() {
         }}
       />
 
-      {/* Duplicate-to-other-day dialog */}
+      {/* Duplicate dialog — escolher Trilha + Dia */}
       {duplicateTo && (
-        <DuplicateToDayDialog
-          dias={diasQ.data ?? []}
+        <DuplicateDialog
+          trilhas={trilhasQ.data ?? []}
+          currentTrilhaId={trilhaId}
           currentDiaId={diaId}
-          value={duplicateDiaId}
-          onChange={setDuplicateDiaId}
           onCancel={() => setDuplicateTo(null)}
-          onConfirm={async () => {
-            await doDuplicate(duplicateTo.acao, duplicateTo.blocos, duplicateDiaId);
+          onConfirm={async (targetDiaId) => {
+            await doDuplicate(duplicateTo.acao, duplicateTo.blocos, targetDiaId);
             setDuplicateTo(null);
           }}
         />
@@ -652,35 +645,86 @@ export default function Mensageria() {
   );
 }
 
-function DuplicateToDayDialog({
-  dias, currentDiaId, value, onChange, onCancel, onConfirm,
+function DuplicateDialog({
+  trilhas, currentTrilhaId, currentDiaId, onCancel, onConfirm,
 }: {
-  dias: Dia[];
+  trilhas: Trilha[];
+  currentTrilhaId: string;
   currentDiaId: string;
-  value: string;
-  onChange: (id: string) => void;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (targetDiaId: string) => void | Promise<void>;
 }) {
-  // Lazy import to avoid loading dialog when not used
-  // Use a lightweight inline dialog
+  const [trilhaSel, setTrilhaSel] = useState(currentTrilhaId);
+  const [diaSel, setDiaSel] = useState(currentDiaId);
+  const [busy, setBusy] = useState(false);
+
+  const diasSelQ = useQuery({
+    queryKey: ["dias-dup", trilhaSel],
+    enabled: !!trilhaSel,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("dias").select("*")
+        .eq("trilha_id", trilhaSel).order("ordem");
+      if (error) throw error;
+      return data as Dia[];
+    },
+  });
+
+  // Quando troca a trilha, garante um dia válido selecionado
+  useEffect(() => {
+    const list = diasSelQ.data;
+    if (!list || list.length === 0) { setDiaSel(""); return; }
+    if (!list.find((d) => d.id === diaSel)) setDiaSel(list[0].id);
+  }, [diasSelQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const semDias = !diasSelQ.isLoading && (diasSelQ.data?.length ?? 0) === 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={onCancel}>
       <div className="bg-popover border border-border rounded-lg p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold">Duplicar para outro dia</h3>
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger className="bg-panel-2"><SelectValue placeholder="Escolha um dia" /></SelectTrigger>
-          <SelectContent>
-            {dias.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.nome} {d.id === currentDiaId && <span className="text-muted-foreground text-xs">(atual)</span>}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-          <Button onClick={onConfirm} disabled={!value}>Duplicar</Button>
+        <h3 className="text-base font-semibold">Duplicar ação</h3>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Trilha</label>
+          <Select value={trilhaSel} onValueChange={setTrilhaSel}>
+            <SelectTrigger className="bg-panel-2"><SelectValue placeholder="Escolha uma trilha" /></SelectTrigger>
+            <SelectContent>
+              {trilhas.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.nome}{t.id === currentTrilhaId ? "  (atual)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Dia</label>
+          <Select value={diaSel} onValueChange={setDiaSel} disabled={diasSelQ.isLoading || semDias}>
+            <SelectTrigger className="bg-panel-2">
+              <SelectValue placeholder={diasSelQ.isLoading ? "Carregando..." : "Escolha um dia"} />
+            </SelectTrigger>
+            <SelectContent>
+              {(diasSelQ.data ?? []).map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.nome}{d.id === currentDiaId ? "  (atual)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {semDias && <p className="text-xs text-muted-foreground">Esta trilha não tem dias.</p>}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancelar</Button>
+          <Button
+            disabled={!diaSel || busy}
+            onClick={async () => {
+              setBusy(true);
+              try { await onConfirm(diaSel); } finally { setBusy(false); }
+            }}
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Duplicar"}
+          </Button>
         </div>
       </div>
     </div>

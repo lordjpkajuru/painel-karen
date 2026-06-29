@@ -192,8 +192,8 @@ function CardActions({ onCopy, onEdit, onDelete, onDuplicate, onToggle, ChevronI
       {onDuplicate && (
         <Button
           size="icon" variant="ghost" className="h-8 w-8"
-          onClick={(e) => onDuplicate({ otherDay: e.shiftKey })}
-          title="Duplicar (Shift+clique para outro dia)"
+          onClick={() => onDuplicate({})}
+          title="Duplicar"
         >
           <Files className="w-4 h-4" />
         </Button>
